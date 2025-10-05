@@ -1,0 +1,89 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_DIR = "/home/ubuntu/microservices"
+        GIT_BRANCH = "main"
+        GIT_CREDENTIALS = "github-credentials-id" // Replace with your Jenkins Git credentials ID
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                // git branch: "${GIT_BRANCH}", 
+                //     url: 'https://github.com/Venkateshkumar1432/Jenkies--Demo.git'
+                git(credentialsId: "${GIT_CREDENTIALS}", url: 'https://github.com/Venkateshkumar1432/Jenkies--Demo.git', branch: 'main')
+            }
+        }
+        stage('Update Code in Deployment Folder') {
+            steps {
+                script {
+                    // Copy all code to deployment folder, overwrite existing
+                    sh """
+                        mkdir -p ${DEPLOY_DIR}
+                        rsync -av --delete ${WORKSPACE}/ ${DEPLOY_DIR}/
+                    """
+                }
+            }
+        }
+
+        stage('Inject Env Files') {
+            steps {
+                script {
+                    // Map each folder to its Jenkins credentials ID
+                    def envFiles = [
+                        "Admin-portal"           : "admin-portal-env",
+                        "service/service-a"    : "service-a-env",
+                        "service/service-b"    : "service-b-env",
+                        "service/service-c"    : "service-c-env"
+                    ]
+
+                    envFiles.each { folder, credId ->
+                        withCredentials([file(credentialsId: credId, variable: 'ENV_FILE')]) {
+                            sh """
+                                cp $ENV_FILE ${DEPLOY_DIR}/${folder}/.env
+                                chmod 600 ${DEPLOY_DIR}/${folder}/.env
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Update Changed Services Only') {
+            steps {
+                script {
+                    // Find changed services based on Git diff
+                    def changedFiles = sh(
+                        script: "git diff --name-only HEAD~1 HEAD",
+                        returnStdout: true
+                    ).trim().split("\n")
+
+                    def changedFolders = [] as Set
+
+                    for (file in changedFiles) {
+                        if (file.contains("/")) {
+                            def folder = file.split("/")[0]
+                            // Include admin-portal and services folder changes
+                            if (folder == "admin-portal" || folder == "service") {
+                                changedFolders.add(folder)
+                            }
+                        }
+                    }
+
+                    echo "Updated folders: ${changedFolders}"
+
+                    // Sync only changed folders
+                    for (folder in changedFolders) {
+                        echo "Updating folder: ${folder}"
+                        sh """
+                            rsync -av --delete ${WORKSPACE}/${folder}/ ${DEPLOY_DIR}/${folder}/
+                        """
+                        echo "Folder ${folder} updated successfully."
+                    }
+                }
+            }
+        }
+    }
+}
