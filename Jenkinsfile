@@ -15,30 +15,21 @@ pipeline {
         stage('Inject Env Files') {
             steps {
                 script {
-                    // Example: Add credentials for each .env file in Jenkins
-                    withCredentials([file(credentialsId: 'admin-portal-env', variable: 'ENV_FILE')]) {
-                        sh '''
-                            cp "$ENV_FILE" "'${DEPLOY_DIR}/Admin-portal/.env'"
-                            chmod 600 "'${DEPLOY_DIR}/Admin-portal/.env'"
-                        '''
-                    }
-                    withCredentials([file(credentialsId: 'service-a-env', variable: 'ENV_FILE')]) {
-                        sh '''
-                            cp "$ENV_FILE" "'${DEPLOY_DIR}/service/service-a/.env'"
-                            chmod 600 "'${DEPLOY_DIR}/service/service-a/.env'"
-                        '''
-                    }
-                    withCredentials([file(credentialsId: 'service-b-env', variable: 'ENV_FILE')]) {
-                        sh '''
-                            cp "$ENV_FILE" "'${DEPLOY_DIR}/service/service-b/.env'"
-                            chmod 600 "'${DEPLOY_DIR}/service/service-b/.env'"
-                        '''
-                    }
-                    withCredentials([file(credentialsId: 'service-c-env', variable: 'ENV_FILE')]) {
-                        sh '''
-                            cp "$ENV_FILE" "'${DEPLOY_DIR}/service/service-c/.env'"
-                            chmod 600 "'${DEPLOY_DIR}/service/service-c/.env'"
-                        '''
+                    // Map each folder to its Jenkins credentials ID
+                    def envFiles = [
+                        "Admin-portal"           : "admin-portal-env",
+                        "service/service-a"    : "service-a-env",
+                        "service/service-b"    : "service-b-env",
+                        "service/service-c"    : "service-c-env"
+                    ]
+
+                    envFiles.each { folder, credId ->
+                        withCredentials([file(credentialsId: credId, variable: 'ENV_FILE')]) {
+                            sh """
+                                cp $ENV_FILE ${DEPLOY_DIR}/${folder}/.env
+                                chmod 600 ${DEPLOY_DIR}/${folder}/.env
+                            """
+                        }
                     }
                 }
             }
