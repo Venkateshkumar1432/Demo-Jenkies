@@ -77,5 +77,12 @@ pipeline {
                 }
             }
         }
+        
+        stage('Cleanup Jenkins Workspace') {
+            steps {
+                echo "Cleaning Jenkins workspace..."
+                cleanWs()  // Automatically cleans everything in Jenkins job workspace
+            }
+        }
     }
 }
